@@ -1,4 +1,4 @@
-import { FeatureGroup, polyline, svg, Util } from "leaflet";
+import { FeatureGroup, polyline, canvas, Util } from "leaflet";
 
 const Layers = { main: Symbol("main"), pulse: Symbol("pulse") };
 
@@ -8,7 +8,7 @@ const Layers = { main: Symbol("main"), pulse: Symbol("pulse") };
  * @extends {L.FeatureGroup}
  */
 export default class AntPath extends FeatureGroup {
-  [Layers.main] = null;
+  [Layers.main] = [];
   [Layers.pulse] = null;
 
   _map = null;
@@ -23,7 +23,7 @@ export default class AntPath extends FeatureGroup {
     paused: false,
     reverse: false,
     hardwareAcceleration: false,
-    renderer: svg({pane: "overlayPane"}),
+    renderer: canvas({ pane: "overlayPane" }),
     delay: 400,
     dashArray: [10, 20],
     weight: 5,
@@ -95,7 +95,7 @@ export default class AntPath extends FeatureGroup {
   _mount() {
     const { pathOpts, pulseOpts } = this._processOptions();
     const { use } = this.options;
-
+    //Todo make a foreach to allow multiple paths, and join them all in 1 pulse layer
     this.addLayer((this[Layers.main] = use(this._path, pathOpts)));
     this.addLayer((this[Layers.pulse] = use(this._path, pulseOpts)));
   }
@@ -138,6 +138,13 @@ export default class AntPath extends FeatureGroup {
     this._map.on("zoomend", this._calculateAnimationSpeed, this);
     this._mount();
     this._calculateAnimationSpeed();
+    const moveCanvas = () => {
+      this._defaultOptions.renderer._ctx.lineDashOffset += (1 / this.options.delay) * 500;
+      this.redraw();
+      window.requestAnimationFrame(moveCanvas);
+    };
+    //* requestAnimation have to be called ONCE for all the Canvas for performance...
+    window.requestAnimationFrame(moveCanvas);
     return this;
   }
 
@@ -149,7 +156,7 @@ export default class AntPath extends FeatureGroup {
     if (layer) {
       layer.removeLayer(this[Layers.main]).removeLayer(this[Layers.pulse]);
     }
-
+    //* Maybe cancel requestAnimationFrame ? https://developer.mozilla.org/en-US/docs/Web/API/Window/cancelAnimationFrame
     return this;
   }
 
@@ -203,7 +210,7 @@ export default class AntPath extends FeatureGroup {
 
   //Polyline interface
   setStyle(options) {
-    const { paused, delay, reverse } = {...this.options, ...options};
+    const { paused, delay, reverse } = { ...this.options, ...options };
     paused ? this.pause() : this.resume();
 
     if (delay !== this.options.delay) {
